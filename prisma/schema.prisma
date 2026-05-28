@@ -1,0 +1,447 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  PARTICIPANT
+  JURY
+  ADMIN
+  COMMS
+}
+
+enum EditionStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum IdeaCategory {
+  CX
+  BI
+  OE
+}
+
+enum IdeaStatus {
+  REGISTERED
+  IDEA_BRIEF_PRESENTED
+  ELIGIBILITY_REVIEW
+  ACCEPTED
+  NOT_ACCEPTED
+  UNDER_DEVELOPMENT
+  QUARTER_FINALIST
+  SEMI_FINALIST
+  FINALIST
+  WINNER
+  ELIMINATED
+}
+
+enum CompetitionRound {
+  QF
+  SF
+  FINAL
+}
+
+enum WorkshopType {
+  IDEATION
+  CUSTOMER_DISCOVERY
+  BUSINESS_MODELLING
+  TESTING_BUSINESS_IDEAS
+  PITCHING
+  OTHER
+}
+
+enum WorkshopStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReportLanguage {
+  EN
+  FR
+}
+
+enum TriggerType {
+  TRG_001
+  TRG_002
+  TRG_003
+}
+
+enum TriggerStatus {
+  PENDING
+  LAUNCHED
+  CLOSED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum TeamMemberRole {
+  MEMBER
+  ADVISOR
+}
+
+// ─── Core Entities ────────────────────────────────────────────────────────────
+
+model Edition {
+  id             String        @id @default(cuid())
+  year           Int           @unique
+  name           String
+  status         EditionStatus @default(ACTIVE)
+  launchDate     DateTime
+  regDeadline    DateTime
+  briefSessionStart DateTime
+  briefSessionEnd   DateTime
+  qfStart        DateTime
+  sfStart        DateTime
+  finalDate      DateTime
+  surveyUrlPostJury        String?
+  surveyUrlPostParticipant String?
+  surveyUrlPostWorkshopDefault String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  users          User[]
+  ideas          Idea[]
+  slots          Slot[]
+  workshops      Workshop[]
+  criteria       Criterion[]
+  reports        Report[]
+  presentations  Presentation[]
+  scores         Score[]
+  conflictDeclarations ConflictDeclaration[]
+  surveyTriggers ExternalSurveyTrigger[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  companyName String?
+  password    String?
+  role        UserRole @default(PARTICIPANT)
+  isActive    Boolean  @default(true)
+  editionId   String?
+  edition     Edition? @relation(fields: [editionId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teamMemberships TeamMember[]
+  bookedSlots     Slot[]       @relation("SlotBooker")
+  submittedReports Report[]    @relation("ReportSubmitter")
+  scores          Score[]
+  conflictDeclarations ConflictDeclaration[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]   @relation("AuditActor")
+  workshopAttendances WorkshopAttendee[]
+  presentingIn    PresentationMember[] @relation("Presenter")
+  observingIn     PresentationObserver[] @relation("Observer")
+
+  @@index([email])
+  @@index([role])
+}
+
+model Idea {
+  id                      String      @id @default(cuid())
+  editionId               String
+  edition                 Edition     @relation(fields: [editionId], references: [id])
+  codeName                String      @unique
+  description1Line        String
+  category                IdeaCategory
+  status                  IdeaStatus  @default(REGISTERED)
+  internalShowcaseApproved Boolean    @default(false)
+  wetransferLink          String?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  team                    Team?
+  reports                 Report[]
+  presentations           Presentation[]
+  scores                  Score[]
+
+  @@index([editionId])
+  @@index([category])
+  @@index([status])
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  editionId String
+  ideaId    String   @unique
+  idea      Idea     @relation(fields: [ideaId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   TeamMember[]
+}
+
+model TeamMember {
+  id        String         @id @default(cuid())
+  teamId    String
+  team      Team           @relation(fields: [teamId], references: [id])
+  userId    String
+  user      User           @relation(fields: [userId], references: [id])
+  role      TeamMemberRole @default(MEMBER)
+  joinedAt  DateTime       @default(now())
+  accepted  Boolean        @default(true)
+
+  @@unique([teamId, userId])
+}
+
+model Slot {
+  id              String   @id @default(cuid())
+  editionId       String
+  edition         Edition  @relation(fields: [editionId], references: [id])
+  date            DateTime
+  startTime       DateTime
+  durationMins    Int      @default(15)
+  isBooked        Boolean  @default(false)
+  bookedById      String?
+  bookedBy        User?    @relation("SlotBooker", fields: [bookedById], references: [id])
+  teamsLink       String?
+  ideaId          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([editionId])
+  @@index([date])
+}
+
+model Report {
+  id           String          @id @default(cuid())
+  ideaId       String
+  idea         Idea            @relation(fields: [ideaId], references: [id])
+  editionId    String
+  edition      Edition         @relation(fields: [editionId], references: [id])
+  round        CompetitionRound
+  fileUrl      String?
+  fileSizeMb   Float?
+  wetransferLink String?
+  language     ReportLanguage  @default(EN)
+  submittedAt  DateTime        @default(now())
+  submittedById String
+  submittedBy  User            @relation("ReportSubmitter", fields: [submittedById], references: [id])
+
+  @@unique([ideaId, round])
+  @@index([editionId])
+}
+
+model Presentation {
+  id                String           @id @default(cuid())
+  ideaId            String
+  idea              Idea             @relation(fields: [ideaId], references: [id])
+  editionId         String
+  edition           Edition          @relation(fields: [editionId], references: [id])
+  round             CompetitionRound
+  scheduledDatetime DateTime?
+  isRehearsal       Boolean          @default(false)
+  pptxUrl           String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  presenters        PresentationMember[]
+  observers         PresentationObserver[]
+
+  @@index([editionId, round])
+}
+
+model PresentationMember {
+  id             String       @id @default(cuid())
+  presentationId String
+  presentation   Presentation @relation(fields: [presentationId], references: [id])
+  userId         String
+  user           User         @relation("Presenter", fields: [userId], references: [id])
+
+  @@unique([presentationId, userId])
+}
+
+model PresentationObserver {
+  id             String       @id @default(cuid())
+  presentationId String
+  presentation   Presentation @relation(fields: [presentationId], references: [id])
+  userId         String
+  user           User         @relation("Observer", fields: [userId], references: [id])
+
+  @@unique([presentationId, userId])
+}
+
+model Workshop {
+  id            String         @id @default(cuid())
+  editionId     String
+  edition       Edition        @relation(fields: [editionId], references: [id])
+  type          WorkshopType
+  sessionDate   DateTime
+  status        WorkshopStatus @default(SCHEDULED)
+  surveyUrlOverride String?
+  description   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  attendees     WorkshopAttendee[]
+  surveyTriggers ExternalSurveyTrigger[]
+}
+
+model WorkshopAttendee {
+  id         String   @id @default(cuid())
+  workshopId String
+  workshop   Workshop @relation(fields: [workshopId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([workshopId, userId])
+}
+
+// ─── Scoring ──────────────────────────────────────────────────────────────────
+
+model Criterion {
+  id                  String   @id @default(cuid())
+  editionId           String
+  edition             Edition  @relation(fields: [editionId], references: [id])
+  number              Int
+  name                String
+  description         String
+  weightPctCX         Float
+  weightPctBI         Float
+  weightPctOE         Float
+  minScore            Int      @default(0)
+  maxScore            Int      @default(5)
+  anchor0             String
+  anchor1             String
+  anchor2             String
+  anchor3             String
+  anchor4             String
+  anchor5             String
+  isTiebreakerBonus   Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  scoreItems          ScoreItem[]
+
+  @@unique([editionId, number])
+}
+
+model Score {
+  id                    String           @id @default(cuid())
+  ideaId                String
+  idea                  Idea             @relation(fields: [ideaId], references: [id])
+  editionId             String
+  edition               Edition          @relation(fields: [editionId], references: [id])
+  round                 CompetitionRound
+  juryMemberId          String
+  juryMember            User             @relation(fields: [juryMemberId], references: [id])
+  conflictDeclared      Boolean          @default(false)
+  weightedTotal         Float?
+  tiebreakerBonusApplied Boolean         @default(false)
+  finalScore            Float?
+  submittedAt           DateTime?
+  isLocked              Boolean          @default(false)
+
+  items                 ScoreItem[]
+
+  @@unique([ideaId, round, juryMemberId])
+  @@index([editionId, round])
+}
+
+model ScoreItem {
+  id          String    @id @default(cuid())
+  scoreId     String
+  score       Score     @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  criterionId String
+  criterion   Criterion @relation(fields: [criterionId], references: [id])
+  rawScore    Int?
+  note        String?
+
+  @@unique([scoreId, criterionId])
+}
+
+model ConflictDeclaration {
+  id                    String           @id @default(cuid())
+  juryMemberId          String
+  juryMember            User             @relation(fields: [juryMemberId], references: [id])
+  editionId             String
+  edition               Edition          @relation(fields: [editionId], references: [id])
+  round                 CompetitionRound
+  conflictedIdeaIds     String[]
+  declaredAt            DateTime         @default(now())
+
+  @@unique([juryMemberId, editionId, round])
+}
+
+// ─── Survey Triggers ──────────────────────────────────────────────────────────
+
+model ExternalSurveyTrigger {
+  id                       String        @id @default(cuid())
+  editionId                String
+  edition                  Edition       @relation(fields: [editionId], references: [id])
+  triggerType              TriggerType
+  workshopId               String?
+  workshop                 Workshop?     @relation(fields: [workshopId], references: [id])
+  firedAt                  DateTime      @default(now())
+  surveyUrl                String?
+  targetAudienceDescription String
+  status                   TriggerStatus @default(PENDING)
+  launchedAt               DateTime?
+  closedAt                 DateTime?
+  escalationSent           Boolean       @default(false)
+  notes                    String?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  @@index([editionId])
+}
+
+// ─── Notifications & Audit ────────────────────────────────────────────────────
+
+model Notification {
+  id          String             @id @default(cuid())
+  editionId   String?
+  edition     Edition?           @relation(fields: [editionId], references: [id])
+  recipientId String
+  recipient   User               @relation(fields: [recipientId], references: [id])
+  type        String
+  subject     String
+  body        String
+  sentAt      DateTime?
+  status      NotificationStatus @default(PENDING)
+  createdAt   DateTime           @default(now())
+
+  @@index([recipientId])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  editionId  String?
+  edition    Edition? @relation(fields: [editionId], references: [id])
+  actorId    String
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  timestamp  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([timestamp])
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  subject   String
+  body      String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
