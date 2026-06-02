@@ -3,8 +3,6 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-const REGISTRATION_DEADLINE = new Date("2026-03-31T23:59:00.000Z")
-
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) {
@@ -51,14 +49,6 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  // Hard enforce registration deadline
-  if (new Date() > REGISTRATION_DEADLINE) {
-    return NextResponse.json(
-      { error: "Registration is closed. The deadline was 31 March 2026 at 11:59 pm." },
-      { status: 403 }
-    )
   }
 
   let body: {
@@ -123,6 +113,14 @@ export async function POST(req: NextRequest) {
     const edition = await prisma.edition.findFirst({ where: { status: "ACTIVE" } })
     if (!edition) {
       return NextResponse.json({ error: "No active edition found" }, { status: 404 })
+    }
+
+    // Enforce registration deadline from DB
+    if (edition.regDeadline && new Date() > new Date(edition.regDeadline)) {
+      return NextResponse.json(
+        { error: "Registration is closed. The submission deadline has passed." },
+        { status: 403 }
+      )
     }
 
     // Check code name uniqueness (system-wide)
