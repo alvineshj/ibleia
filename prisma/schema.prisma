@@ -188,14 +188,17 @@ model Team {
 }
 
 model TeamMember {
-  id        String         @id @default(cuid())
-  teamId    String
-  team      Team           @relation(fields: [teamId], references: [id])
-  userId    String
-  user      User           @relation(fields: [userId], references: [id])
-  role      TeamMemberRole @default(MEMBER)
-  joinedAt  DateTime       @default(now())
-  accepted  Boolean        @default(true)
+  id           String         @id @default(cuid())
+  teamId       String
+  team         Team           @relation(fields: [teamId], references: [id])
+  userId       String?
+  user         User?          @relation(fields: [userId], references: [id])
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  role         TeamMemberRole @default(MEMBER)
+  joinedAt     DateTime       @default(now())
+  accepted     Boolean        @default(true)
 
   @@unique([teamId, userId])
 }

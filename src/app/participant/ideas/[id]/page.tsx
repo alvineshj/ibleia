@@ -252,7 +252,7 @@ export default async function IdeaDetailPage({ params }: Props) {
   if (!idea) notFound()
 
   const isAdmin = session.user.role === "ADMIN" || session.user.role === "JURY"
-  const isMember = idea.team?.members.some((m) => m.user.id === session.user.id)
+  const isMember = idea.team?.members.some((m) => m.user?.id === session.user.id)
   if (!isMember && !isAdmin) redirect("/ideas")
 
   const slot = await prisma.slot.findFirst({
@@ -410,20 +410,25 @@ export default async function IdeaDetailPage({ params }: Props) {
             <p className="text-sm text-muted-foreground">No team members found.</p>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {idea.team.members.map((m) => (
-                <li key={m.id} className="flex items-center justify-between py-2 text-sm">
-                  <div>
-                    <p className="font-medium">{m.user.name}</p>
-                    <p className="text-xs text-muted-foreground">{m.user.email}</p>
-                    {m.user.companyName && (
-                      <p className="text-xs text-gray-400">{m.user.companyName}</p>
-                    )}
-                  </div>
-                  <Badge variant="secondary" className="text-xs capitalize">
-                    {m.role.toLowerCase()}
-                  </Badge>
-                </li>
-              ))}
+              {idea.team.members.map((m) => {
+                const name = m.user?.name ?? m.contactName ?? "—"
+                const email = m.user?.email ?? m.contactEmail ?? "—"
+                const phone = m.contactPhone
+                const company = m.user?.companyName
+                return (
+                  <li key={m.id} className="flex items-start justify-between py-2 text-sm">
+                    <div>
+                      <p className="font-medium">{name}</p>
+                      <p className="text-xs text-muted-foreground">{email}</p>
+                      {phone && <p className="text-xs text-gray-400">{phone}</p>}
+                      {company && <p className="text-xs text-gray-400">{company}</p>}
+                    </div>
+                    <Badge variant="secondary" className="text-xs capitalize shrink-0">
+                      {m.role.toLowerCase()}
+                    </Badge>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </CardContent>

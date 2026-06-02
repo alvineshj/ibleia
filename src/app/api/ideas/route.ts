@@ -3,6 +3,12 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+type TeamContact = {
+  name: string
+  email: string
+  phone: string
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) {
@@ -56,7 +62,7 @@ export async function POST(req: NextRequest) {
     description1Line: string
     category: string
     slotId?: string
-    teamMemberEmails?: string[]
+    teamMembers?: TeamContact[]
   }
 
   try {
@@ -65,9 +71,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
 
-  const { codeName, description1Line, category, slotId, teamMemberEmails = [] } = body
+  const { codeName, description1Line, category, slotId, teamMembers = [] } = body
 
-  // Validate required fields
   if (!codeName || !description1Line || !category) {
     return NextResponse.json(
       { error: "codeName, description1Line, and category are required" },
@@ -75,7 +80,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Validate category
   if (!["CX", "BI", "OE"].includes(category)) {
     return NextResponse.json(
       { error: "category must be one of CX, BI, OE" },
@@ -83,7 +87,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Validate description word count (max 10 words)
   const wordCount = description1Line.trim().split(/\s+/).filter(Boolean).length
   if (wordCount > 10) {
     return NextResponse.json(
@@ -92,7 +95,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Validate code name format (no spaces, URL-safe)
   if (!/^[a-zA-Z0-9_-]+$/.test(codeName)) {
     return NextResponse.json(
       { error: "Code name can only contain letters, numbers, hyphens, and underscores" },
@@ -100,22 +102,35 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Validate team size: at most 10 members total (including registrant)
-  if (teamMemberEmails.length > 9) {
+  if (teamMembers.length === 0) {
     return NextResponse.json(
-      { error: "A team can have at most 10 members (including yourself)" },
+      { error: "At least one team member contact is required." },
       { status: 400 }
     )
   }
 
+  if (teamMembers.length > 9) {
+    return NextResponse.json(
+      { error: "A team can have at most 9 additional members (10 total including yourself)" },
+      { status: 400 }
+    )
+  }
+
+  for (const m of teamMembers) {
+    if (!m.name?.trim() || !m.email?.trim() || !m.phone?.trim()) {
+      return NextResponse.json(
+        { error: "Each team member must have a name, email, and phone number." },
+        { status: 400 }
+      )
+    }
+  }
+
   try {
-    // Get active edition
     const edition = await prisma.edition.findFirst({ where: { status: "ACTIVE" } })
     if (!edition) {
       return NextResponse.json({ error: "No active edition found" }, { status: 404 })
     }
 
-    // Enforce registration deadline from DB
     if (edition.regDeadline && new Date() > new Date(edition.regDeadline)) {
       return NextResponse.json(
         { error: "Registration is closed. The submission deadline has passed." },
@@ -123,7 +138,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Check code name uniqueness (system-wide)
     const existing = await prisma.idea.findUnique({ where: { codeName } })
     if (existing) {
       return NextResponse.json(
@@ -132,7 +146,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Check one idea per category per team (current user's existing ideas in same category)
     const userIdeaInCategory = await prisma.teamMember.findFirst({
       where: {
         userId: session.user.id,
@@ -151,7 +164,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validate slot if provided
     if (slotId) {
       const slot = await prisma.slot.findUnique({ where: { id: slotId } })
       if (!slot) {
@@ -168,28 +180,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve additional team member user IDs
-    let additionalMemberIds: string[] = []
-    if (teamMemberEmails.length > 0) {
-      const memberUsers = await prisma.user.findMany({
-        where: { email: { in: teamMemberEmails }, isActive: true },
-        select: { id: true, email: true },
-      })
-      const foundEmails = memberUsers.map((u) => u.email)
-      const missing = teamMemberEmails.filter((e) => !foundEmails.includes(e))
-      if (missing.length > 0) {
-        return NextResponse.json(
-          { error: `These email addresses were not found: ${missing.join(", ")}` },
-          { status: 400 }
-        )
-      }
-      // Exclude the registrant if they added themselves
-      additionalMemberIds = memberUsers
-        .map((u) => u.id)
-        .filter((id) => id !== session.user.id)
-    }
-
-    // Create idea, team, book slot in a transaction
     const result = await prisma.$transaction(async (tx) => {
       const idea = await tx.idea.create({
         data: {
@@ -207,8 +197,15 @@ export async function POST(req: NextRequest) {
           ideaId: idea.id,
           members: {
             create: [
+              // Registrant linked to their account
               { userId: session.user.id, role: "MEMBER" },
-              ...additionalMemberIds.map((uid) => ({ userId: uid, role: "MEMBER" as const })),
+              // Additional members stored as contact info only
+              ...teamMembers.map((m) => ({
+                contactName: m.name.trim(),
+                contactEmail: m.email.trim().toLowerCase(),
+                contactPhone: m.phone.trim(),
+                role: "MEMBER" as const,
+              })),
             ],
           },
         },
@@ -229,7 +226,7 @@ export async function POST(req: NextRequest) {
           action: "IDEA_REGISTERED",
           entityType: "Idea",
           entityId: idea.id,
-          metadata: { codeName, category, slotId },
+          metadata: { codeName, category, slotId, memberCount: teamMembers.length + 1 },
         },
       })
 

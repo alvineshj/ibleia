@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (!idea) return NextResponse.json({ error: "Idea not found" }, { status: 404 })
 
-  const isMember = idea.team?.members.some((m) => m.user.id === session.user.id)
+  const isMember = idea.team?.members.some((m) => m.user?.id === session.user.id)
   if (!isMember) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   // Check deadline
@@ -60,16 +60,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const slotTime = new Date(slot.startTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
 
   for (const member of idea.team?.members ?? []) {
+    const email = member.user?.email ?? member.contactEmail
+    const name = member.user?.name ?? member.contactName ?? "Team member"
+    if (!email) continue
     await sendEmail({
-      to: member.user.email,
+      to: email,
       ...slotBookingEmail({
-        name: member.user.name,
+        name,
         slotDate,
         slotTime,
         teamsLink: slot.teamsLink ?? undefined,
         ideaCodeName: idea.codeName,
       }),
-      recipientId: member.user.id,
+      recipientId: member.user?.id,
       type: "SLOT_BOOKING",
       editionId: idea.editionId,
     }).catch(console.error)

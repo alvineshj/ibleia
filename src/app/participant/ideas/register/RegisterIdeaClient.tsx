@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import { CATEGORY_LABELS } from "@/lib/utils"
 import {
   AlertCircle,
@@ -23,10 +22,17 @@ import {
   Lock,
   Plus,
   Trash2,
+  Users,
 } from "lucide-react"
+
+type TeamMember = { name: string; email: string; phone: string }
 
 function countWords(str: string): number {
   return str.trim().split(/\s+/).filter(Boolean).length
+}
+
+function emptyMember(): TeamMember {
+  return { name: "", email: "", phone: "" }
 }
 
 export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date | null }) {
@@ -36,8 +42,9 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
   const [codeName, setCodeName] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
-  const [teamEmails, setTeamEmails] = useState<string[]>([])
-  const [newEmail, setNewEmail] = useState("")
+
+  // First member is mandatory
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([emptyMember()])
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -47,6 +54,20 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
   const wordCountOk = wordCount <= 10
   const codeNameValid = /^[a-zA-Z0-9_-]+$/.test(codeName)
 
+  function updateMember(index: number, field: keyof TeamMember, value: string) {
+    setTeamMembers((prev) => prev.map((m, i) => (i === index ? { ...m, [field]: value } : m)))
+  }
+
+  function addMember() {
+    if (teamMembers.length >= 9) return
+    setTeamMembers((prev) => [...prev, emptyMember()])
+  }
+
+  function removeMember(index: number) {
+    if (index === 0) return // first member is mandatory
+    setTeamMembers((prev) => prev.filter((_, i) => i !== index))
+  }
+
   function validate(): boolean {
     const e: Record<string, string> = {}
     if (!codeName.trim()) e.codeName = "Code name is required"
@@ -54,28 +75,16 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
     if (!description.trim()) e.description = "Description is required"
     else if (!wordCountOk) e.description = "Must be 10 words or fewer"
     if (!category) e.category = "Please select a category"
+
+    teamMembers.forEach((m, i) => {
+      if (!m.name.trim()) e[`member_${i}_name`] = "Full name is required"
+      if (!m.email.trim()) e[`member_${i}_email`] = "Email is required"
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.email)) e[`member_${i}_email`] = "Enter a valid email"
+      if (!m.phone.trim()) e[`member_${i}_phone`] = "Mobile number is required"
+    })
+
     setErrors(e)
     return Object.keys(e).length === 0
-  }
-
-  function addTeamEmail() {
-    const email = newEmail.trim().toLowerCase()
-    if (!email) return
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setErrors((e) => ({ ...e, newEmail: "Enter a valid email address" }))
-      return
-    }
-    if (teamEmails.includes(email)) {
-      setErrors((e) => ({ ...e, newEmail: "Email already added" }))
-      return
-    }
-    if (teamEmails.length >= 9) {
-      setErrors((e) => ({ ...e, newEmail: "Maximum 9 additional members (10 total)" }))
-      return
-    }
-    setTeamEmails((prev) => [...prev, email])
-    setNewEmail("")
-    setErrors((e) => { const { newEmail: _, ...rest } = e; return rest })
   }
 
   async function handleSubmit() {
@@ -90,7 +99,7 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
           codeName,
           description1Line: description,
           category,
-          teamMemberEmails: teamEmails,
+          teamMembers,
         }),
       })
       const data = await res.json()
@@ -132,18 +141,16 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
         </p>
       </div>
 
+      {/* ── Idea details ─────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-ibl-blue" />
             Idea Information
           </CardTitle>
-          <CardDescription>
-            Give your idea a unique code name and a brief description.
-          </CardDescription>
+          <CardDescription>Give your idea a unique code name and a brief description.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Code name */}
           <div className="space-y-1.5">
             <Label htmlFor="codeName">
               Idea Code Name <span className="text-red-500">*</span>
@@ -165,7 +172,6 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
             )}
           </div>
 
-          {/* One-line description */}
           <div className="space-y-1.5">
             <Label htmlFor="description">
               One-Line Description <span className="text-red-500">*</span>
@@ -193,7 +199,6 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
             </div>
           </div>
 
-          {/* Category */}
           <div className="space-y-1.5">
             <Label htmlFor="category">
               Category <span className="text-red-500">*</span>
@@ -211,91 +216,132 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
                 ))}
               </SelectContent>
             </Select>
-            {errors.category && (
-              <p className="text-xs text-red-500">{errors.category}</p>
-            )}
+            {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
           </div>
-
-          {/* Team members */}
-          <div className="space-y-1.5">
-            <Label>Additional Team Members</Label>
-            <p className="text-xs text-muted-foreground">
-              Add colleagues by their IBL platform email address. Team: min 1, max 10 members.
-            </p>
-            <div className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="colleague@iblgroup.com"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTeamEmail())}
-                className={errors.newEmail ? "border-red-400" : ""}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={addTeamEmail}
-                disabled={teamEmails.length >= 9}
-                title="Add member"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            {errors.newEmail && (
-              <p className="text-xs text-red-500">{errors.newEmail}</p>
-            )}
-            {teamEmails.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {teamEmails.map((email) => (
-                  <li
-                    key={email}
-                    className="flex items-center justify-between rounded-md bg-gray-50 border border-gray-200 px-3 py-1.5 text-sm"
-                  >
-                    <span>{email}</span>
-                    <button
-                      type="button"
-                      onClick={() => setTeamEmails((prev) => prev.filter((e) => e !== email))}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                      title="Remove"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {teamEmails.length + 1} / 10 members added (including you)
-            </p>
-          </div>
-
-          {submitError && (
-            <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              {submitError}
-            </div>
-          )}
-
-          <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
-            After registering, you can book your Idea Brief Session slot from the idea page.
-          </div>
-
-          <Button variant="ibl" className="w-full" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Registering…
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="h-4 w-4" />
-                Register Idea
-              </>
-            )}
-          </Button>
         </CardContent>
       </Card>
+
+      {/* ── Team members ─────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="h-5 w-5 text-ibl-blue" />
+            Team Member Contacts
+          </CardTitle>
+          <CardDescription>
+            Provide contact details for each team member. At least one entry is required.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {teamMembers.map((member, index) => (
+            <div
+              key={index}
+              className="rounded-md border border-gray-200 bg-gray-50 p-4 space-y-3 relative"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {index === 0 ? "Participant 1 (required)" : `Participant ${index + 1}`}
+                </p>
+                {index > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => removeMember(index)}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    title="Remove"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Full Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="John Smith"
+                    value={member.name}
+                    onChange={(e) => updateMember(index, "name", e.target.value)}
+                    className={errors[`member_${index}_name`] ? "border-red-400" : ""}
+                  />
+                  {errors[`member_${index}_name`] && (
+                    <p className="text-xs text-red-500">{errors[`member_${index}_name`]}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Email <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    type="email"
+                    placeholder="john@iblgroup.com"
+                    value={member.email}
+                    onChange={(e) => updateMember(index, "email", e.target.value)}
+                    className={errors[`member_${index}_email`] ? "border-red-400" : ""}
+                  />
+                  {errors[`member_${index}_email`] && (
+                    <p className="text-xs text-red-500">{errors[`member_${index}_email`]}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Mobile Number <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    type="tel"
+                    placeholder="+961 71 000 000"
+                    value={member.phone}
+                    onChange={(e) => updateMember(index, "phone", e.target.value)}
+                    className={errors[`member_${index}_phone`] ? "border-red-400" : ""}
+                  />
+                  {errors[`member_${index}_phone`] && (
+                    <p className="text-xs text-red-500">{errors[`member_${index}_phone`]}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {teamMembers.length < 9 && (
+            <Button type="button" variant="outline" size="sm" onClick={addMember} className="w-full">
+              <Plus className="h-4 w-4" />
+              Add Another Team Member
+            </Button>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            {teamMembers.length} / 9 additional members entered (max 10 total including yourself)
+          </p>
+        </CardContent>
+      </Card>
+
+      {submitError && (
+        <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          {submitError}
+        </div>
+      )}
+
+      <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+        After registering, you can book your Idea Brief Session slot from the idea page.
+      </div>
+
+      <Button variant="ibl" className="w-full" onClick={handleSubmit} disabled={submitting}>
+        {submitting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Registering…
+          </>
+        ) : (
+          <>
+            <CheckCircle2 className="h-4 w-4" />
+            Register Idea
+          </>
+        )}
+      </Button>
     </div>
   )
 }

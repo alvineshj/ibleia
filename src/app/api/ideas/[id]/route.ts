@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     // Participants can only view ideas they belong to; admins/jury see all
     const isAdmin = session.user.role === "ADMIN" || session.user.role === "JURY"
     if (!isAdmin) {
-      const isMember = idea.team?.members.some((m) => m.user.id === session.user.id)
+      const isMember = idea.team?.members.some((m) => m.user?.id === session.user.id)
       if (!isMember) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
