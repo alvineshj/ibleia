@@ -340,7 +340,7 @@ export default async function IdeaDetailPage({ params }: Props) {
       )}
 
       {/* Booked slot */}
-      {slot && (
+      {slot ? (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -370,6 +370,26 @@ export default async function IdeaDetailPage({ params }: Props) {
                 Join MS Teams
               </a>
             )}
+          </CardContent>
+        </Card>
+      ) : isMember && idea.status === "REGISTERED" && (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Idea Brief Session Slot — Not Booked Yet
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-4">
+            <p className="text-sm text-amber-700">
+              Book a 15-minute slot for your Idea Brief Session on MS Teams.
+            </p>
+            <Button variant="ibl" size="sm" asChild>
+              <Link href={`/participant/ideas/${idea.id}/book-slot`}>
+                <Calendar className="h-3.5 w-3.5" />
+                Book Slot
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       )}

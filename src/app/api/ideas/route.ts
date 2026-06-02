@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     codeName: string
     description1Line: string
     category: string
-    slotId: string
+    slotId?: string
     teamMemberEmails?: string[]
   }
 
@@ -68,9 +68,9 @@ export async function POST(req: NextRequest) {
   const { codeName, description1Line, category, slotId, teamMemberEmails = [] } = body
 
   // Validate required fields
-  if (!codeName || !description1Line || !category || !slotId) {
+  if (!codeName || !description1Line || !category) {
     return NextResponse.json(
-      { error: "codeName, description1Line, category, and slotId are required" },
+      { error: "codeName, description1Line, and category are required" },
       { status: 400 }
     )
   }
@@ -151,19 +151,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validate slot
-    const slot = await prisma.slot.findUnique({ where: { id: slotId } })
-    if (!slot) {
-      return NextResponse.json({ error: "Slot not found" }, { status: 404 })
-    }
-    if (slot.isBooked) {
-      return NextResponse.json(
-        { error: "This slot has already been booked. Please select another slot." },
-        { status: 409 }
-      )
-    }
-    if (slot.editionId !== edition.id) {
-      return NextResponse.json({ error: "Slot does not belong to active edition" }, { status: 400 })
+    // Validate slot if provided
+    if (slotId) {
+      const slot = await prisma.slot.findUnique({ where: { id: slotId } })
+      if (!slot) {
+        return NextResponse.json({ error: "Slot not found" }, { status: 404 })
+      }
+      if (slot.isBooked) {
+        return NextResponse.json(
+          { error: "This slot has already been booked. Please select another slot." },
+          { status: 409 }
+        )
+      }
+      if (slot.editionId !== edition.id) {
+        return NextResponse.json({ error: "Slot does not belong to active edition" }, { status: 400 })
+      }
     }
 
     // Resolve additional team member user IDs
@@ -213,10 +215,12 @@ export async function POST(req: NextRequest) {
         include: { members: { include: { user: { select: { id: true, name: true, email: true } } } } },
       })
 
-      await tx.slot.update({
-        where: { id: slotId },
-        data: { isBooked: true, bookedById: session.user.id, ideaId: idea.id },
-      })
+      if (slotId) {
+        await tx.slot.update({
+          where: { id: slotId },
+          data: { isBooked: true, bookedById: session.user.id, ideaId: idea.id },
+        })
+      }
 
       await tx.auditLog.create({
         data: {
@@ -229,7 +233,7 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      return { idea, team, slot }
+      return { idea, team }
     })
 
     return NextResponse.json({ success: true, idea: result.idea, team: result.team }, { status: 201 })
