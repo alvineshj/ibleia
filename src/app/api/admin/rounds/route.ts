@@ -108,12 +108,27 @@ export async function GET(req: NextRequest) {
 
       const quorumMet = quorumStatus.every((s) => s.allJuryDone)
 
+      const lastRoundAudit = await prisma.auditLog.findFirst({
+        where: {
+          entityType: "Edition",
+          entityId: edition.id,
+          action: { in: ["OPEN_ROUND", "CLOSE_ROUND"] },
+          metadata: { path: ["round"], equals: round },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+
+      let roundStatus: "not_started" | "open" | "closed" = "not_started"
+      if (lastRoundAudit?.action === "OPEN_ROUND") roundStatus = "open"
+      else if (lastRoundAudit?.action === "CLOSE_ROUND") roundStatus = "closed"
+
       return {
         round,
         editionId: edition.id,
         ideasCount: ideas.length,
         quorumMet,
         quorumStatus,
+        roundStatus,
       }
     })
   )

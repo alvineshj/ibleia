@@ -37,6 +37,7 @@ interface RoundData {
   ideasCount: number
   quorumMet: boolean
   quorumStatus: QuorumEntry[]
+  roundStatus: "not_started" | "open" | "closed"
 }
 
 interface RoundsResponse {
@@ -133,6 +134,7 @@ export default function AdminRoundsPage() {
           const isExpanded = expandedRound === roundData.round
           const scoredCount = roundData.quorumStatus.filter((s) => s.allJuryDone).length
           const totalIdeas = roundData.quorumStatus.length
+          const isClosed = roundData.roundStatus === "closed"
 
           return (
             <Card key={roundData.round}>
@@ -150,6 +152,15 @@ export default function AdminRoundsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {roundData.roundStatus === "open" && (
+                      <Badge variant="success">Open</Badge>
+                    )}
+                    {roundData.roundStatus === "closed" && (
+                      <Badge variant="destructive">Closed</Badge>
+                    )}
+                    {roundData.roundStatus === "not_started" && (
+                      <Badge variant="secondary">Not Started</Badge>
+                    )}
                     {roundData.quorumMet ? (
                       <Badge variant="success">Quorum Met</Badge>
                     ) : (
@@ -186,8 +197,14 @@ export default function AdminRoundsPage() {
                   <Button
                     size="sm"
                     variant="ibl"
-                    disabled={!!submitting || !roundData.quorumMet}
-                    title={!roundData.quorumMet ? "Quorum not met" : undefined}
+                    disabled={!!submitting || !roundData.quorumMet || !isClosed}
+                    title={
+                      !roundData.quorumMet
+                        ? "Quorum not met"
+                        : !isClosed
+                        ? "Close the round before triggering progression"
+                        : undefined
+                    }
                     onClick={() => performAction("trigger_progression", roundData.round)}
                   >
                     <ArrowRight className="h-3.5 w-3.5 mr-1.5" />
