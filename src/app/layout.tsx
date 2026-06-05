@@ -3,6 +3,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/components/shared/providers"
+import DevToolbar from "@/components/dev-toolbar"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <Toaster />
         </Providers>
+        {process.env.NODE_ENV === "development" && <DevToolbar />}
       </body>
     </html>
   )
