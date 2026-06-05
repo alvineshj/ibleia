@@ -211,11 +211,11 @@ export default async function IdeasListPage() {
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/ideas/${idea.id}`}>View Details</Link>
+                      <Link href={`/participant/ideas/${idea.id}`}>View Details</Link>
                     </Button>
                     {ACTIVE_REPORT_STATUSES.includes(idea.status as IdeaStatus) && (
                       <Button variant="ibl" size="sm" asChild>
-                        <Link href={`/ideas/${idea.id}/report`}>
+                        <Link href={`/participant/ideas/${idea.id}/report`}>
                           <FileText className="h-3.5 w-3.5" />
                           Submit Report
                         </Link>
