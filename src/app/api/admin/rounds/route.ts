@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
           action: { in: ["OPEN_ROUND", "CLOSE_ROUND"] },
           metadata: { path: ["round"], equals: round },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { timestamp: "desc" },
       })
 
       let roundStatus: "not_started" | "open" | "closed" = "not_started"
