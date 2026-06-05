@@ -146,24 +146,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const userIdeaInCategory = await prisma.teamMember.findFirst({
-      where: {
-        userId: session.user.id,
-        team: {
-          idea: {
-            category: category as "CX" | "BI" | "OE",
-            editionId: edition.id,
-          },
-        },
-      },
-    })
-    if (userIdeaInCategory) {
-      return NextResponse.json(
-        { error: "You already have an idea registered in this category for the current edition." },
-        { status: 409 }
-      )
-    }
-
     if (slotId) {
       const slot = await prisma.slot.findUnique({ where: { id: slotId } })
       if (!slot) {
