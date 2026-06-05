@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { action, round, editionId } = body as {
-    action: "close_round" | "trigger_progression" | "apply_tiebreak" | "open_round"
+    action: "close_round" | "trigger_progression" | "apply_tiebreak" | "open_round" | "assign_to_round"
     round: CompetitionRound
     editionId: string
   }
@@ -142,6 +142,31 @@ export async function POST(req: NextRequest) {
 
   const edition = await prisma.edition.findUnique({ where: { id: editionId } })
   if (!edition) return NextResponse.json({ error: "Edition not found" }, { status: 404 })
+
+  if (action === "assign_to_round") {
+    const { ideaIds } = body as { ideaIds: string[] }
+    if (!ideaIds?.length) return NextResponse.json({ error: "ideaIds required" }, { status: 400 })
+
+    const targetStatus = ROUND_TO_STATUS[round]
+
+    await prisma.idea.updateMany({
+      where: { id: { in: ideaIds } },
+      data: { status: targetStatus },
+    })
+
+    // Create a Presentation record for each idea that doesn't have one yet in this round
+    for (const ideaId of ideaIds) {
+      const exists = await prisma.presentation.findFirst({ where: { ideaId, round } })
+      if (!exists) await prisma.presentation.create({ data: { ideaId, editionId, round } })
+    }
+
+    await writeAuditLog(session.user.id, "ASSIGN_TO_ROUND", "Edition", editionId, {
+      round,
+      ideaIds,
+    })
+
+    return NextResponse.json({ success: true, assigned: ideaIds.length })
+  }
 
   if (action === "open_round") {
     await writeAuditLog(session.user.id, "OPEN_ROUND", "Edition", editionId, { round })
@@ -281,6 +306,11 @@ export async function POST(req: NextRequest) {
         where: { id: { in: advancingIds } },
         data: { status: ROUND_TO_STATUS[nextRound] },
       })
+      // Create Presentation records for the next round so ideas appear in scoring/rounds views
+      for (const ideaId of advancingIds) {
+        const exists = await prisma.presentation.findFirst({ where: { ideaId, round: nextRound } })
+        if (!exists) await prisma.presentation.create({ data: { ideaId, editionId, round: nextRound } })
+      }
     } else {
       await prisma.idea.updateMany({
         where: { id: { in: advancingIds } },

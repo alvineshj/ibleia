@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { CATEGORY_LABELS, STATUS_LABELS } from "@/lib/utils"
-import { Lightbulb, Search, CheckCircle2, XCircle, Eye } from "lucide-react"
+import { Lightbulb, Search, CheckCircle2, XCircle, Eye, Trophy } from "lucide-react"
 
 type IdeaCategory = "CX" | "BI" | "OE"
 type IdeaStatus =
@@ -31,6 +31,7 @@ type IdeaStatus =
 
 interface IdeaRow {
   id: string
+  editionId: string
   codeName: string
   description1Line: string
   category: IdeaCategory
@@ -137,6 +138,21 @@ export default function AdminIdeasPage() {
     setSubmitting(null)
   }
 
+  async function assignToRound(ideaIds: string[], round: "QF" | "SF" | "FINAL") {
+    setSubmitting("bulk")
+    // Get editionId from the first matching idea via the API response
+    const editionId = ideas.find((i) => ideaIds.includes(i.id))?.editionId
+    if (!editionId) { setSubmitting(null); return }
+    await fetch("/api/admin/rounds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "assign_to_round", round, editionId, ideaIds }),
+    })
+    setSelected(new Set())
+    await fetchIdeas()
+    setSubmitting(null)
+  }
+
   function toggleSelect(id: string) {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -221,9 +237,9 @@ export default function AdminIdeasPage() {
       </Card>
 
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex-wrap">
           <span className="text-sm font-medium text-blue-800">{selected.size} selected</span>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
               size="sm"
               variant="outline"
@@ -243,6 +259,16 @@ export default function AdminIdeasPage() {
             >
               <XCircle className="h-3.5 w-3.5 mr-1.5" />
               Reject All
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-purple-700 border-purple-300 hover:bg-purple-50"
+              disabled={submitting === "bulk"}
+              onClick={() => assignToRound(Array.from(selected), "QF")}
+            >
+              <Trophy className="h-3.5 w-3.5 mr-1.5" />
+              Assign to QF
             </Button>
             <Button
               size="sm"
@@ -331,7 +357,7 @@ export default function AdminIdeasPage() {
                           </button>
                         </td>
                         <td className="py-2.5">
-                          <div className="flex gap-1">
+                          <div className="flex gap-1 flex-wrap">
                             {(idea.status === "ELIGIBILITY_REVIEW" || idea.status === "IDEA_BRIEF_PRESENTED" || idea.status === "REGISTERED") && (
                               <>
                                 <Button
@@ -355,6 +381,19 @@ export default function AdminIdeasPage() {
                                   Reject
                                 </Button>
                               </>
+                            )}
+                            {(idea.status === "ACCEPTED" || idea.status === "UNDER_DEVELOPMENT") && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-purple-700 border-purple-300 hover:bg-purple-50"
+                                disabled={submitting === idea.id}
+                                onClick={() => assignToRound([idea.id], "QF")}
+                                title="Set as Quarter-Finalist and register for QF scoring"
+                              >
+                                <Trophy className="h-3 w-3 mr-1" />
+                                → QF
+                              </Button>
                             )}
                             <Button
                               size="sm"
