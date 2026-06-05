@@ -177,7 +177,7 @@ export default function ReportUploadPage() {
             <AlertCircle className="h-10 w-10 text-red-400 mx-auto mb-3" />
             <p className="text-red-600 font-medium">{loadError}</p>
             <Button variant="outline" className="mt-4" asChild>
-              <Link href="/ideas">Back to My Ideas</Link>
+              <Link href="/participant/ideas">Back to My Ideas</Link>
             </Button>
           </CardContent>
         </Card>

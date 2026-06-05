@@ -93,7 +93,7 @@ export default async function IdeasListPage() {
         </div>
         {!regDeadlinePassed && (
           <Button variant="ibl" asChild>
-            <Link href="/ideas/register">
+            <Link href="/participant/ideas/register">
               <Plus className="h-4 w-4" />
               Register New Idea
             </Link>
@@ -138,7 +138,7 @@ export default async function IdeasListPage() {
             </p>
             {!regDeadlinePassed ? (
               <Button variant="ibl" asChild>
-                <Link href="/ideas/register">
+                <Link href="/participant/ideas/register">
                   <Lightbulb className="h-4 w-4" />
                   Register Your First Idea
                 </Link>

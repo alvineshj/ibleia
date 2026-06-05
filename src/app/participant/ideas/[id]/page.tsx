@@ -253,7 +253,7 @@ export default async function IdeaDetailPage({ params }: Props) {
 
   const isAdmin = session.user.role === "ADMIN" || session.user.role === "JURY"
   const isMember = idea.team?.members.some((m) => m.user?.id === session.user.id)
-  if (!isMember && !isAdmin) redirect("/ideas")
+  if (!isMember && !isAdmin) redirect("/participant/ideas")
 
   const slot = await prisma.slot.findFirst({
     where: { ideaId: idea.id },
@@ -293,14 +293,14 @@ export default async function IdeaDetailPage({ params }: Props) {
         <div className="flex gap-2 flex-wrap">
           {canSubmitReport && (
             <Button variant="ibl" size="sm" asChild>
-              <Link href={`/ideas/${idea.id}/report`}>
+              <Link href={`/participant/ideas/${idea.id}/report`}>
                 <FileText className="h-3.5 w-3.5" />
                 Submit Report
               </Link>
             </Button>
           )}
           <Button variant="outline" size="sm" asChild>
-            <Link href="/ideas">Back to My Ideas</Link>
+            <Link href="/participant/ideas">Back to My Ideas</Link>
           </Button>
         </div>
       </div>
@@ -450,7 +450,7 @@ export default async function IdeaDetailPage({ params }: Props) {
               {canSubmitReport && (
                 <div className="mt-3">
                   <Button variant="ibl" size="sm" asChild>
-                    <Link href={`/ideas/${idea.id}/report`}>Submit Report</Link>
+                    <Link href={`/participant/ideas/${idea.id}/report`}>Submit Report</Link>
                   </Button>
                 </div>
               )}
@@ -505,7 +505,7 @@ export default async function IdeaDetailPage({ params }: Props) {
                   {canSubmitReport && (
                     <div className="mt-2">
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/ideas/${idea.id}/report`}>
+                        <Link href={`/participant/ideas/${idea.id}/report`}>
                           Re-submit / Update
                         </Link>
                       </Button>
