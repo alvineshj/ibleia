@@ -149,16 +149,54 @@ export async function POST(req: NextRequest) {
 
     const targetStatus = ROUND_TO_STATUS[round]
 
+    // 1. Update idea statuses
     await prisma.idea.updateMany({
       where: { id: { in: ideaIds } },
       data: { status: targetStatus },
     })
 
-    // Create a Presentation record for each idea that doesn't have one yet in this round
+    // 2. Create Presentation records (required for ideas to appear in rounds/scoring views)
     for (const ideaId of ideaIds) {
       const exists = await prisma.presentation.findFirst({ where: { ideaId, round } })
       if (!exists) await prisma.presentation.create({ data: { ideaId, editionId, round } })
     }
+
+    // 3. Create draft Score records for every jury member so they appear in the jury scoring page
+    const juryMembers = await prisma.user.findMany({
+      where: { role: "JURY", editionId },
+      select: { id: true },
+    })
+
+    // Fetch all declared conflicts for this edition upfront
+    const conflicts = await prisma.conflictDeclaration.findMany({
+      where: { editionId },
+      select: { juryMemberId: true, conflictedIdeaIds: true },
+    })
+
+    const scoreRows: {
+      ideaId: string
+      editionId: string
+      round: typeof round
+      juryMemberId: string
+      conflictDeclared: boolean
+    }[] = []
+
+    for (const ideaId of ideaIds) {
+      for (const jury of juryMembers) {
+        const hasConflict = conflicts.some(
+          (c) => c.juryMemberId === jury.id && c.conflictedIdeaIds.includes(ideaId)
+        )
+        scoreRows.push({
+          ideaId,
+          editionId,
+          round,
+          juryMemberId: jury.id,
+          conflictDeclared: hasConflict,
+        })
+      }
+    }
+
+    await prisma.score.createMany({ data: scoreRows, skipDuplicates: true })
 
     await writeAuditLog(session.user.id, "ASSIGN_TO_ROUND", "Edition", editionId, {
       round,
@@ -306,11 +344,31 @@ export async function POST(req: NextRequest) {
         where: { id: { in: advancingIds } },
         data: { status: ROUND_TO_STATUS[nextRound] },
       })
-      // Create Presentation records for the next round so ideas appear in scoring/rounds views
+      // Create Presentation records and draft Score rows for the next round
+      const nextJuryMembers = await prisma.user.findMany({
+        where: { role: "JURY", editionId },
+        select: { id: true },
+      })
+      const nextConflicts = await prisma.conflictDeclaration.findMany({
+        where: { editionId },
+        select: { juryMemberId: true, conflictedIdeaIds: true },
+      })
       for (const ideaId of advancingIds) {
         const exists = await prisma.presentation.findFirst({ where: { ideaId, round: nextRound } })
         if (!exists) await prisma.presentation.create({ data: { ideaId, editionId, round: nextRound } })
       }
+      const nextScoreRows = advancingIds.flatMap((ideaId) =>
+        nextJuryMembers.map((jury) => ({
+          ideaId,
+          editionId,
+          round: nextRound,
+          juryMemberId: jury.id,
+          conflictDeclared: nextConflicts.some(
+            (c) => c.juryMemberId === jury.id && c.conflictedIdeaIds.includes(ideaId)
+          ),
+        }))
+      )
+      await prisma.score.createMany({ data: nextScoreRows, skipDuplicates: true })
     } else {
       await prisma.idea.updateMany({
         where: { id: { in: advancingIds } },
