@@ -18,12 +18,10 @@ import {
   ROUND_LABELS,
   formatDate,
   formatDateTime,
-  formatTime,
 } from "@/lib/utils"
 import {
   AlertCircle,
   BookOpen,
-  Calendar,
   CheckCircle2,
   Circle,
   ExternalLink,
@@ -31,7 +29,6 @@ import {
   Lightbulb,
   Link2,
   Users,
-  Video,
 } from "lucide-react"
 import { IdeaStatus } from "@prisma/client"
 
@@ -255,11 +252,6 @@ export default async function IdeaDetailPage({ params }: Props) {
   const isMember = idea.team?.members.some((m) => m.user?.id === session.user.id)
   if (!isMember && !isAdmin) redirect("/participant/ideas")
 
-  const slot = await prisma.slot.findFirst({
-    where: { ideaId: idea.id },
-    select: { date: true, startTime: true, durationMins: true, teamsLink: true },
-  })
-
   const hasQFReport = idea.reports.some((r) => r.round === "QF")
   const hasSFReport = idea.reports.some((r) => r.round === "SF")
   const hasFinalReport = idea.reports.some((r) => r.round === "FINAL")
@@ -335,61 +327,6 @@ export default async function IdeaDetailPage({ params }: Props) {
               hasQFReport={hasQFReport}
               wetransferLink={idea.wetransferLink}
             />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Booked slot */}
-      {slot ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-ibl-blue" />
-              Idea Brief Session Slot
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm space-y-1">
-            <p>
-              <span className="text-muted-foreground">Date:</span>{" "}
-              <strong>{formatDate(slot.date)}</strong>
-            </p>
-            <p>
-              <span className="text-muted-foreground">Time:</span>{" "}
-              <strong>
-                {formatTime(slot.startTime)} ({slot.durationMins} min)
-              </strong>
-            </p>
-            {slot.teamsLink && (
-              <a
-                href={slot.teamsLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-ibl-blue hover:underline mt-1"
-              >
-                <Video className="h-4 w-4" />
-                Join MS Teams
-              </a>
-            )}
-          </CardContent>
-        </Card>
-      ) : isMember && idea.status === "REGISTERED" && (
-        <Card className="border-amber-200 bg-amber-50/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-amber-800 flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Idea Brief Session Slot — Not Booked Yet
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-between gap-4">
-            <p className="text-sm text-amber-700">
-              Book a 15-minute slot for your Idea Brief Session on MS Teams.
-            </p>
-            <Button variant="ibl" size="sm" asChild>
-              <Link href={`/participant/ideas/${idea.id}/book-slot`}>
-                <Calendar className="h-3.5 w-3.5" />
-                Book Slot
-              </Link>
-            </Button>
           </CardContent>
         </Card>
       )}

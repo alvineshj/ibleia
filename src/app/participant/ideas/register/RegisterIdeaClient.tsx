@@ -136,8 +136,7 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Register a New Idea</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          IBL Excellence &amp; Innovation Award 2026 — You can book your Idea Brief Session slot
-          after registration.
+          IBL Excellence &amp; Innovation Award 2026
         </p>
       </div>
 
@@ -324,10 +323,6 @@ export default function RegisterIdeaClient({ regDeadline }: { regDeadline: Date 
           {submitError}
         </div>
       )}
-
-      <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
-        After registering, you can book your Idea Brief Session slot from the idea page.
-      </div>
 
       <Button variant="ibl" className="w-full" onClick={handleSubmit} disabled={submitting}>
         {submitting ? (
