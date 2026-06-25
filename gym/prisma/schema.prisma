@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("GYM_DATABASE_URL")
+}
+
+enum BjjBelt {
+  WHITE
+  BLUE
+  PURPLE
+  BROWN
+  BLACK
+}
+
+enum PaymentType {
+  MONTHLY
+  ANNUAL
+  DROP_IN
+  GRADING_FEE
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  OVERDUE
+  CANCELLED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model Member {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String   @unique
+  phone       String?
+  dateOfBirth DateTime?
+  joinDate    DateTime @default(now())
+  active      Boolean  @default(true)
+  belt        BjjBelt  @default(WHITE)
+  stripes     Int      @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attendances  Attendance[]
+  payments     Payment[]
+  promotions   BeltPromotion[]
+}
+
+model Class {
+  id          String    @id @default(cuid())
+  name        String
+  instructor  String
+  dayOfWeek   DayOfWeek
+  startTime   String
+  durationMin Int       @default(60)
+  maxStudents Int?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  attendances Attendance[]
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  memberId  String
+  classId   String
+  date      DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  class  Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, classId, date])
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  memberId    String
+  amount      Float
+  currency    String        @default("USD")
+  type        PaymentType
+  status      PaymentStatus @default(PAID)
+  paidAt      DateTime?
+  dueDate     DateTime?
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
+
+model BeltPromotion {
+  id       String   @id @default(cuid())
+  memberId String
+  fromBelt BjjBelt
+  toBelt   BjjBelt
+  stripes  Int      @default(0)
+  date     DateTime @default(now())
+  notes    String?
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
